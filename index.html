@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Flexible Scraper Demo</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <style>
+    body {
+      margin:0;
+      min-height:100vh;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      font-family:Inter,Arial, sans-serif;
+      background: url("https://images.unsplash.com/photo-1512820790803-83ca734da794") center/cover fixed no-repeat;
+    }
+    .card {
+      width:90%;
+      max-width:980px;
+      background: rgba(255,255,255,0.95);
+      padding:22px;
+      border-radius:12px;
+      box-shadow:0 10px 30px rgba(0,0,0,0.15);
+      text-align:left;
+    }
+    h1 { margin:0 0 12px; font-size:20px; }
+    .row { display:flex; gap:10px; flex-wrap:wrap; margin-bottom:12px; }
+    input[type=text], select {
+      flex:1;
+      padding:10px 12px;
+      border:1px solid #ddd;
+      border-radius:8px;
+      font-size:14px;
+    }
+    .controls { display:flex; gap:10px; align-items:center; margin-bottom:12px; }
+    button {
+      background:#2563eb;color:white;border:none;padding:10px 16px;border-radius:8px;cursor:pointer;font-weight:600;
+    }
+    button:disabled { opacity:0.6; cursor:not-allowed; }
+    .small { font-size:13px; color:#555; margin-bottom:8px; }
+    #output { margin-top:12px; max-height:50vh; overflow:auto; border-top:1px solid #eee; padding-top:12px; }
+    .item { padding:10px; border-radius:8px; background:#fafafa; margin-bottom:10px; }
+    .item img { max-width:150px; display:block; margin-top:6px; border-radius:6px; }
+    .inline { display:flex; gap:12px; align-items:center; flex-wrap:wrap; }
+    label { font-size:14px; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>Custom Scraper — enter a URL & choose what to scrape</h1>
+
+    <div class="small">Enter the full page URL you want to scrape (http or https). The backend fetches the page and returns data.</div>
+
+    <div class="row">
+      <input id="url" type="text" placeholder="https://example.com/page" />
+      <select id="mode">
+        <option value="titles">Titles (h1, h2, h3)</option>
+        <option value="quotes">Quotes (span.text / blockquote)</option>
+        <option value="images">Images (&lt;img&gt;)</option>
+        <option value="custom">Custom CSS selector</option>
+      </select>
+      <button id="scrapeBtn">Scrape</button>
+    </div>
+
+    <div id="customRow" style="display:none;" class="row">
+      <input id="selector" type="text" placeholder="Enter CSS selector (e.g. .quote .text or .product_pod h3 a)"/>
+      <div class="small">When using "Custom", type a CSS selector and press Scrape.</div>
+    </div>
+
+    <div id="status" class="small"></div>
+
+    <div id="output"></div>
+  </div>
+
+  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+  <script>
+    $(function(){
+      $('#mode').on('change', function(){
+        if ($(this).val() === 'custom') $('#customRow').show();
+        else $('#customRow').hide();
+      });
+
+      $('#scrapeBtn').on('click', function(){
+        $('#output').empty();
+        $('#status').text('');
+        const url = $('#url').val().trim();
+        const mode = $('#mode').val();
+        const selector = $('#selector').val().trim();
+
+        if (!url) {
+          $('#status').text('Please enter a URL.');
+          return;
+        }
+        if (mode === 'custom' && !selector) {
+          $('#status').text('Please enter a CSS selector for custom mode.');
+          return;
+        }
+
+        $(this).prop('disabled', true);
+        $('#status').text('Scraping... (this may take a few seconds)');
+
+        $.ajax({
+          url: '/scrape',
+          method: 'POST',
+          contentType: 'application/json',
+          data: JSON.stringify({ url: url, mode: mode, selector: selector }),
+          success: function(resp) {
+            $('#scrapeBtn').prop('disabled', false);
+            $('#status').text(`Found ${resp.count} items (mode: ${resp.mode}) for ${resp.url}`);
+            if (resp.results && resp.results.length) {
+              resp.results.forEach(function(r){
+                const $item = $('<div class="item"></div>');
+                if (r.type === 'image' && r.src) {
+                  $item.append($('<div><b>Image</b></div>'));
+                  $item.append($('<div>').text(r.alt || r.src));
+                  $item.append($('<img>').attr('src', r.src).attr('alt', r.alt || 'image'));
+                } else if (r.type === 'title' || r.type === 'quote' || r.type === 'custom') {
+                  $item.append($('<div><b>' + (r.type.charAt(0).toUpperCase() + r.type.slice(1)) + '</b></div>'));
+                  $item.append($('<div>').text(r.text || ''));
+                  if (r.html) {
+                    const $pre = $('<pre style="white-space:pre-wrap;margin-top:6px;"></pre>').text(r.html);
+                    $item.append($pre);
+                  }
+                } else {
+                  $item.text(JSON.stringify(r));
+                }
+                $('#output').append($item);
+              });
+            } else {
+              $('#output').append($('<div class="item">No items found.</div>'));
+            }
+          },
+          error: function(xhr){
+            $('#scrapeBtn').prop('disabled', false);
+            const msg = xhr.responseJSON && xhr.responseJSON.error ? xhr.responseJSON.error : 'Unknown error';
+            $('#status').text('Error: ' + msg);
+          },
+          timeout: 30000
+        });
+      });
+    });
+  </script>
+</body>
+</html>
