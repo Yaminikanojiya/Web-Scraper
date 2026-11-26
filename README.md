@@ -1,7 +1,7 @@
 #  Flask Web Scraper API
 
 A secure and lightweight **Flask-based web scraper** that extracts **titles, quotes, images, or custom HTML elements** from any public webpage.  
-Includes **SSRF protection**, **content-size limits**, and **CSS selector support** for safe, flexible data extraction.
+Includes **SSRF protection**, **content-size limits**, and **CSS selector support** for safe, flexible data extraction Scapper is the great tool  for researchers to do the research from large webapplication .
 
 ---
 
